@@ -1,0 +1,82 @@
+---
+title: "Activity Monitoring Project"
+author: "Lynn Kiaer"
+date: "Sunday, October 19, 2014"
+output: html_document
+---
+
+##Loading the Data
+
+```{r}
+setwd(".")
+data <- read.csv("./data/activity.csv")
+```
+
+##Total Steps Per Day
+
+First, calculate the total number of steps for each day, and then create a histogram of the daily totals.
+
+```{r}
+daily <- aggregate(data$steps, list(data$date), sum, na.rm = TRUE, simplify = TRUE)
+hist(daily[, 2], main = "Daily Steps", xlab = "Total Steps per Day")
+```
+
+Based on the plot, the mean and median should be around ten thousand steps per day.  
+
+```{r}
+mean(daily[, 2])
+median(daily[, 2])
+```
+
+The mean (9354) is a bit lower than the median (10395), not surprising since the mean is more affected by extreme values than the median.
+
+##Daily Activity Pattern
+
+To determine the daily activity pattern, we need to average the readings for each interval and plot the resulting time series.
+
+```{r}
+pattern <- aggregate(data$steps, list(data$interval), mean, na.rm = TRUE, simplify = TRUE)
+plot(pattern, type = "l", main = "Daily Activity Pattern", xlab = "Interval")
+pattern[max(pattern$x),]
+```
+
+Interval 1705 contains, on average, the largest number of steps.  Based on the numbering (or naming) scheme for this data set, this corresponds to the interval from 5:00 pm to 5:05 pm.  Apparently this person is most consistently most active when work gets out!
+
+##Imputing Missing Data
+
+Imputing missing data is always a bit of a challenge.  If we use the average for the balance of the day, and the missing data includes a lot of time sleeping, or the most active part of the day, we could end up with very unreasonable numbers. Using the average for the time period is probably a bit better, though it may tend to blur any distinction between weekdays and weekends.
+
+```{r}
+missing <- sum(is.na(data$steps))
+missing
+missing / nrow(data)
+```
+
+So about 13% of the data is missing.  Not great, but not awful either.  Now, to create a dataset that has the same values as the original, where they exist, and replaces the missing values with imputed ones.  We'll be a little clever and calculate the standard deviation of the interval means, and use that to generate a little variability into the imputed data.  There is doubtless a snazzy way to do this, but I'll do it with a loop...
+
+```{r}
+seed <- 1
+i <- 1
+imputed <- data
+dev <- aggregate(data$steps, list(data$interval), sd, na.rm = TRUE, simplify = TRUE)
+while(i <= nrow(imputed)) {
+        if (is.na(imputed$steps[i])) {
+                m <- pattern[which(pattern$Group.1 == imputed$interval[i]), 2]
+                s <- dev[which(dev$Group.1 == imputed$interval[i]), 2]
+                imputed$steps[i] <- trunc(rnorm(1,m, s))
+        }
+        i <- i + 1
+}
+sum(is.na(imputed$steps))
+impdaily <- aggregate(imputed$steps, list(imputed$date), sum, na.rm = TRUE, simplify = TRUE)
+hist(impdaily[, 2], main = "Daily Steps (imputed data)", xlab = "Total Steps per Day")
+mean(impdaily[, 2])
+median(impdaily[, 2])
+```
+
+The effect of imputing the missing data is to increase both the mean (a lot) and the median (by a bit less), bringing them much closer together.  The histogram show fewer days with very small numbers of steps, and more with a moderate number.  The days with a lot of steps apparently didn't have much missing data (which makes sense).
+
+##Weekdays versus Weekends
+
+I think I am out of time.
+
